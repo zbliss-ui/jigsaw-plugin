@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta http-equiv="X-UA-Compatible" content="IE=Edge" />
+<title>Jigsaw Track Changes</title>
+<script type="text/javascript" src="https://appsforoffice.microsoft.com/lib/1.1/hosted/office.js"></script>
+<style>
+  :root {
+    --deep-cove: #141B4D;
+    --deep-cove-dark: #0F1435;
+    --deep-cove-lightest: #F3F6FF;
+    --deep-cove-light: #CEDBFF;
+    --crimson: #AE2573;
+    --coral: #FF6D6A;
+    --star-white: #ECECE7;
+    --star-white-light: #F5F4F2;
+    --white: #ffffff;
+    --insert-bg: #e6f4ea;
+    --insert-color: #1a7f37;
+    --insert-border: #2da44e;
+    --delete-bg: #ffeef0;
+    --delete-color: #cf222e;
+    --delete-border: #f85149;
+    --font-heading: 'Söhne Breit', 'Sohne Breit', Arial, Helvetica, sans-serif;
+    --font-body: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --shadow-sm: 0 1px 3px rgba(20,27,77,0.06);
+    --shadow-md: 0 2px 8px rgba(20,27,77,0.10);
+    --shadow-lg: 0 8px 24px rgba(20,27,77,0.14);
+    --radius: 8px;
+    --radius-sm: 5px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: var(--font-body);
+    background: var(--star-white-light);
+    color: var(--deep-cove);
+    font-size: 13px;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .header {
+    background: linear-gradient(135deg, #141B4D 0%, #AE2573 60%, #FF6D6A 100%);
+    padding: 14px 16px 12px;
+    flex-shrink: 0;
+  }
+  .header-top { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .logo { width: 22px; height: 22px; flex-shrink: 0; }
+  .header-title { font-family: var(--font-heading); font-size: 13px; font-weight: 600; color: var(--white); letter-spacing: 0.04em; text-transform: uppercase; }
+  .header-sub { font-size: 11px; color: rgba(255,255,255,0.65); margin-left: auto; }
+  .status-bar { display: flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.12); border-radius: var(--radius-sm); padding: 6px 10px; }
+  .status-dot { width: 7px; height: 7px; border-radius: 50%; background: rgba(255,255,255,0.35); transition: background 0.3s; flex-shrink: 0; }
+  .status-dot.active { background: #4ade80; box-shadow: 0 0 6px #4ade80; }
+  .status-dot.reviewing { background: #F8E08E; box-shadow: 0 0 6px #F8E08E; }
+  .status-text { font-size: 11px; color: rgba(255,255,255,0.85); flex: 1; }
+  .change-count { font-size: 11px; font-weight: 600; color: var(--white); background: rgba(255,255,255,0.2); padding: 2px 7px; border-radius: 10px; display: none; }
+  .change-count.visible { display: inline; }
+  .controls { padding: 12px 14px; background: var(--white); border-bottom: 1px solid rgba(20,27,77,0.08); flex-shrink: 0; }
+  .btn-row { display: flex; gap: 7px; margin-bottom: 8px; }
+  .btn { flex: 1; padding: 8px 10px; border: none; border-radius: var(--radius-sm); font-family: var(--font-body); font-size: 12px; font-weight: 600; cursor: pointer; transition: all 0.15s; display: flex; align-items: center; justify-content: center; gap: 5px; letter-spacing: 0.01em; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-primary { background: var(--deep-cove); color: var(--white); }
+  .btn-primary:hover:not(:disabled) { background: var(--deep-cove-dark); transform: translateY(-1px); box-shadow: var(--shadow-md); }
+  .btn-primary.tracking { background: #1a7f37; }
+  .btn-secondary { background: var(--star-white); color: var(--deep-cove); border: 1px solid rgba(20,27,77,0.12); }
+  .btn-secondary:hover:not(:disabled) { background: var(--deep-cove-lightest); }
+  .bulk-row { display: flex; gap: 5px; }
+  .btn-bulk { flex: 1; padding: 6px 8px; border: 1px solid; border-radius: var(--radius-sm); font-family: var(--font-body); font-size: 11px; font-weight: 600; cursor: pointer; transition: all 0.15s; letter-spacing: 0.01em; }
+  .btn-accept-all { background: var(--insert-bg); color: var(--insert-color); border-color: var(--insert-border); }
+  .btn-accept-all:hover:not(:disabled) { background: #cef0d3; }
+  .btn-reject-all { background: var(--delete-bg); color: var(--delete-color); border-color: var(--delete-border); }
+  .btn-reject-all:hover:not(:disabled) { background: #ffd5d8; }
+  .btn-bulk:disabled { opacity: 0.35; cursor: not-allowed; }
+  .changes-area { flex: 1; overflow-y: auto; padding: 10px 12px; display: flex; flex-direction: column; gap: 7px; }
+  .changes-area::-webkit-scrollbar { width: 4px; }
+  .changes-area::-webkit-scrollbar-thumb { background: var(--deep-cove-light); border-radius: 4px; }
+  .empty-state { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; color: rgba(20,27,77,0.35); text-align: center; padding: 20px; }
+  .empty-icon { font-size: 32px; opacity: 0.4; }
+  .empty-title { font-weight: 600; font-size: 13px; color: rgba(20,27,77,0.5); }
+  .empty-desc { font-size: 11px; line-height: 1.5; }
+  .change-card { background: var(--white); border-radius: var(--radius); border: 1px solid rgba(20,27,77,0.08); overflow: hidden; box-shadow: var(--shadow-sm); transition: box-shadow 0.15s, transform 0.15s; animation: slideIn 0.25s ease; }
+  .change-card:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
+  @keyframes slideIn { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+  .card-header { display: flex; align-items: center; gap: 7px; padding: 8px 10px 6px; border-bottom: 1px solid rgba(20,27,77,0.05); }
+  .change-type-badge { font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 10px; letter-spacing: 0.06em; text-transform: uppercase; }
+  .badge-insert { background: var(--insert-bg); color: var(--insert-color); }
+  .badge-delete { background: var(--delete-bg); color: var(--delete-color); }
+  .badge-replace { background: #fff3cd; color: #856404; }
+  .card-meta { font-size: 10px; color: rgba(20,27,77,0.45); margin-left: auto; white-space: nowrap; }
+  .card-author { display: flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 500; color: rgba(20,27,77,0.6); }
+  .avatar { width: 16px; height: 16px; border-radius: 50%; background: linear-gradient(135deg, var(--deep-cove), var(--crimson)); color: white; font-size: 8px; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .card-body { padding: 8px 10px; }
+  .card-slide-ref { font-size: 10px; color: rgba(20,27,77,0.4); margin-bottom: 5px; display: flex; align-items: center; gap: 4px; }
+  .card-slide-ref::before { content: ''; display: inline-block; width: 8px; height: 8px; border-radius: 2px; background: var(--deep-cove-light); flex-shrink: 0; }
+  .diff-view { font-size: 12px; line-height: 1.6; background: var(--star-white-light); border-radius: var(--radius-sm); padding: 7px 9px; font-family: var(--font-body); }
+  .diff-delete { background: var(--delete-bg); color: var(--delete-color); text-decoration: line-through; border-radius: 2px; padding: 0 2px; }
+  .diff-insert { background: var(--insert-bg); color: var(--insert-color); text-decoration: underline; text-underline-offset: 2px; border-radius: 2px; padding: 0 2px; }
+  .diff-context { color: rgba(20,27,77,0.55); }
+  .card-actions { display: flex; gap: 5px; padding: 6px 10px 8px; }
+  .btn-accept, .btn-reject { flex: 1; padding: 5px 8px; border-radius: var(--radius-sm); font-size: 11px; font-weight: 600; cursor: pointer; border: 1px solid; transition: all 0.12s; font-family: var(--font-body); }
+  .btn-accept { background: var(--insert-bg); color: var(--insert-color); border-color: var(--insert-border); }
+  .btn-accept:hover { background: #cef0d3; }
+  .btn-reject { background: var(--delete-bg); color: var(--delete-color); border-color: var(--delete-border); }
+  .btn-reject:hover { background: #ffd5d8; }
+  .section-label { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(20,27,77,0.4); padding: 4px 0 2px; display: flex; align-items: center; gap: 6px; }
+  .section-label::after { content: ''; flex: 1; height: 1px; background: rgba(20,27,77,0.08); }
+  .toast { position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%) translateY(40px); background: var(--deep-cove); color: var(--white); font-size: 12px; font-weight: 500; padding: 8px 16px; border-radius: 20px; box-shadow: var(--shadow-lg); opacity: 0; transition: all 0.25s; pointer-events: none; white-space: nowrap; z-index: 1000; }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  .debug { font-size: 10px; color: rgba(20,27,77,0.4); padding: 6px 14px; background: var(--deep-cove-lightest); border-bottom: 1px solid rgba(20,27,77,0.06); flex-shrink: 0; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-top">
+    <svg class="logo" viewBox="0 0 22 22" fill="none">
+      <rect x="0" y="0" width="10" height="10" rx="2" fill="white" opacity="0.9"/>
+      <rect x="12" y="0" width="10" height="10" rx="2" fill="white" opacity="0.6"/>
+      <rect x="0" y="12" width="10" height="10" rx="2" fill="white" opacity="0.6"/>
+      <rect x="12" y="12" width="10" height="10" rx="2" fill="white" opacity="0.9"/>
+    </svg>
+    <span class="header-title">Track Changes</span>
+    <span class="header-sub">Jigsaw</span>
+  </div>
+  <div class="status-bar">
+    <div class="status-dot" id="statusDot"></div>
+    <span class="status-text" id="statusText">Initialising…</span>
+    <span class="change-count" id="changeCount"></span>
+  </div>
+</div>
+
+<div class="debug" id="debugBar">Loading Office.js…</div>
+
+<div class="controls">
+  <div class="btn-row">
+    <button class="btn btn-primary" id="btnTrack" onclick="toggleTracking()" disabled>
+      <span id="trackIcon">▶</span>
+      <span id="trackLabel">Start Tracking</span>
+    </button>
+    <button class="btn btn-secondary" id="btnRefresh" onclick="manualCheck()" disabled>↻ Check</button>
+  </div>
+  <div class="bulk-row">
+    <button class="btn-bulk btn-accept-all" id="btnAcceptAll" onclick="acceptAll()" disabled>✓ Accept All</button>
+    <button class="btn-bulk btn-reject-all" id="btnRejectAll" onclick="rejectAll()" disabled>✕ Reject All</button>
+  </div>
+</div>
+
+<div class="changes-area" id="changesArea">
+  <div class="empty-state">
+    <div class="empty-icon">📋</div>
+    <div class="empty-title">No changes yet</div>
+    <div class="empty-desc">Once ready, click "Start Tracking" then edit any text box on your slide. Click outside the text box and changes will appear here.</div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script type="text/javascript">
+// ─── State ───────────────────────────────────────────────────────────────────
+var isTracking = false;
+var snapshot   = {};
+var changes    = [];
+var pollingTimer = null;
+var idCounter  = 0;
+var POLL_MS    = 1200;
+var officeReady = false;
+
+// ─── Debug helper ────────────────────────────────────────────────────────────
+function dbg(msg) {
+  console.log('[JTC] ' + msg);
+  var el = document.getElementById('debugBar');
+  if (el) el.textContent = msg;
+}
+
+// ─── Office init ─────────────────────────────────────────────────────────────
+Office.initialize = function(reason) {
+  dbg('Office.initialize fired');
+  onOfficeReady();
+};
+
+Office.onReady(function(info) {
+  dbg('Office.onReady fired — host: ' + (info.host || 'unknown'));
+  onOfficeReady();
+});
+
+function onOfficeReady() {
+  if (officeReady) return;
+  officeReady = true;
+  dbg('Ready — click Start Tracking');
+  document.getElementById('statusText').textContent = 'Ready — click Start Tracking';
+  document.getElementById('btnTrack').disabled = false;
+}
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+function flatText(shapeSnap) {
+  return shapeSnap.paragraphs.map(function(p) {
+    return p.runs.map(function(r) { return r.text; }).join('');
+  }).join('\n');
+}
+
+function esc(s) {
+  return (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function fmtTime(d) {
+  var s = Math.floor((Date.now() - d) / 1000);
+  if (s < 10) return 'just now';
+  if (s < 60) return s + 's ago';
+  if (s < 3600) return Math.floor(s/60) + 'm ago';
+  return d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+}
+
+// ─── Snapshot ────────────────────────────────────────────────────────────────
+function takeSnapshot() {
+  var snap = {};
+  return PowerPoint.run(function(ctx) {
+    var slides = ctx.presentation.slides;
+    slides.load('items');
+    return ctx.sync().then(function() {
+      if (!slides.items.length) { dbg('No slides found'); return; }
+      var slide = slides.items[0];
+      slide.load('shapes');
+      return ctx.sync().then(function() {
+        slide.shapes.load('items');
+        return ctx.sync().then(function() {
+          dbg('Found ' + slide.shapes.items.length + ' shapes');
+          var shapePromises = slide.shapes.items.map(function(shape) {
+            shape.load('id,name');
+            return ctx.sync().then(function() {
+              var tf = shape.textFrame;
+              tf.load('paragraphs');
+              return ctx.sync().then(function() {
+                tf.paragraphs.load('items');
+                return ctx.sync().then(function() {
+                  var paraPromises = tf.paragraphs.items.map(function(para) {
+                    para.load('textRanges');
+                    return ctx.sync().then(function() {
+                      para.textRanges.load('items');
+                      return ctx.sync().then(function() {
+                        var runPromises = para.textRanges.items.map(function(run) {
+                          run.load('text');
+                          return ctx.sync().then(function() {
+                            var runData = { text: run.text, bold: false, italic: false, size: null, color: null, underline: false, fontName: null };
+                            try {
+                              run.font.load('bold,italic,size,color,underline,name');
+                              return ctx.sync().then(function() {
+                                runData.bold     = run.font.bold;
+                                runData.italic   = run.font.italic;
+                                runData.size     = run.font.size;
+                                runData.color    = run.font.color;
+                                runData.underline = run.font.underline;
+                                runData.fontName = run.font.name;
+                                return runData;
+                              });
+                            } catch(fe) { return runData; }
+                          });
+                        });
+                        return Promise.all(runPromises);
+                      });
+                    });
+                  });
+                  return Promise.all(paraPromises).then(function(paraData) {
+                    snap[shape.id] = { name: shape.name, paragraphs: paraData.map(function(runs) { return { runs: runs }; }) };
+                  });
+                });
+              });
+            }).catch(function() { /* no text frame */ });
+          });
+          return Promise.all(shapePromises);
+        });
+      });
+    });
+  }).then(function() {
+    dbg('Snapshot done — ' + Object.keys(snap).length + ' text shapes');
+    return snap;
+  }).catch(function(e) {
+    dbg('Snapshot error: ' + e.message);
+    return snap;
+  });
+}
+
+// ─── Diff ────────────────────────────────────────────────────────────────────
+function tokenize(text) {
+  return (text.match(/\S+|\s+/g) || []);
+}
+
+function wordDiff(oldText, newText) {
+  var a = tokenize(oldText), b = tokenize(newText);
+  var m = a.length, n = b.length;
+  var dp = [];
+  for (var i = 0; i <= m; i++) { dp[i] = []; for (var j = 0; j <= n; j++) dp[i][j] = 0; }
+  for (var i = 1; i <= m; i++)
+    for (var j = 1; j <= n; j++)
+      dp[i][j] = a[i-1] === b[j-1] ? dp[i-1][j-1]+1 : Math.max(dp[i-1][j], dp[i][j-1]);
+  var res = [], i = m, j = n;
+  while (i > 0 || j > 0) {
+    if (i > 0 && j > 0 && a[i-1] === b[j-1]) { res.unshift({type:'equal',  text:a[i-1]}); i--; j--; }
+    else if (j > 0 && (i===0 || dp[i][j-1] >= dp[i-1][j])) { res.unshift({type:'insert', text:b[j-1]}); j--; }
+    else { res.unshift({type:'delete', text:a[i-1]}); i--; }
+  }
+  return res;
+}
+
+// ─── Detect changes ──────────────────────────────────────────────────────────
+function detectChanges(oldSnap, newSnap) {
+  var found = [];
+  Object.keys(newSnap).forEach(function(id) {
+    if (!oldSnap[id]) return;
+    var oldText = flatText(oldSnap[id]);
+    var newText = flatText(newSnap[id]);
+    if (oldText === newText) return;
+
+    var existing = null;
+    for (var k = 0; k < changes.length; k++) {
+      if (changes[k].shapeId === id && !changes[k].resolved) { existing = changes[k]; break; }
+    }
+
+    var diff = wordDiff(oldText, newText);
+    var hasIns = diff.some(function(d) { return d.type==='insert'; });
+    var hasDel = diff.some(function(d) { return d.type==='delete'; });
+    var type = hasIns && hasDel ? 'replace' : hasIns ? 'insert' : 'delete';
+
+    if (existing) {
+      existing.newText = newText;
+      existing.diff    = diff;
+      existing.type    = type;
+      existing._dirty  = true;
+    } else {
+      found.push({
+        id:        'c' + (++idCounter),
+        shapeId:   id,
+        shapeName: newSnap[id].name || 'Text Box',
+        type:      type,
+        oldText:   oldText,
+        newText:   newText,
+        diff:      diff,
+        origParas: JSON.parse(JSON.stringify(oldSnap[id].paragraphs)),
+        author:    'You',
+        timestamp: new Date(),
+        resolved:  false,
+        _dirty:    false
+      });
+    }
+  });
+  return found;
+}
+
+// ─── Apply markup ────────────────────────────────────────────────────────────
+function applyMarkup(change) {
+  return PowerPoint.run(function(ctx) {
+    return getShape(ctx, change.shapeId).then(function(shape) {
+      if (!shape) { dbg('Shape not found for markup'); return; }
+      var tf = shape.textFrame;
+      var fullText = change.diff.map(function(d) { return d.text; }).join('');
+      tf.text = fullText;
+      return ctx.sync().then(function() {
+        tf.load('paragraphs');
+        return ctx.sync().then(function() {
+          tf.paragraphs.load('items');
+          return ctx.sync().then(function() {
+            if (!tf.paragraphs.items.length) return;
+            var para = tf.paragraphs.items[0];
+            var pos = 0;
+            var segPromises = change.diff.map(function(seg) {
+              var len = seg.text.length;
+              var start = pos;
+              pos += len;
+              if (seg.type === 'equal' || len === 0) return Promise.resolve();
+              try {
+                var range = para.getTextRange(start, len);
+                if (seg.type === 'insert') {
+                  range.font.color = '0070C0';
+                  range.font.underline = PowerPoint.ShapeFontUnderlineStyle.single;
+                  range.font.strikethrough = false;
+                } else if (seg.type === 'delete') {
+                  range.font.color = 'C00000';
+                  range.font.strikethrough = true;
+                  range.font.underline = PowerPoint.ShapeFontUnderlineStyle.none;
+                }
+                return ctx.sync();
+              } catch(re) {
+                dbg('Range error: ' + re.message);
+                return Promise.resolve();
+              }
+            });
+            return Promise.all(segPromises);
+          });
+        });
+      });
+    });
+  }).catch(function(e) { dbg('applyMarkup error: ' + e.message); });
+}
+
+// ─── Accept ──────────────────────────────────────────────────────────────────
+function applyAccept(change) {
+  return PowerPoint.run(function(ctx) {
+    return getShape(ctx, change.shapeId).then(function(shape) {
+      if (!shape) return;
+      var tf = shape.textFrame;
+      var cleanText = change.diff.filter(function(d) { return d.type !== 'delete'; }).map(function(d) { return d.text; }).join('');
+      tf.text = cleanText;
+      return ctx.sync().then(function() {
+        return restoreFont(ctx, tf, change.origParas);
+      });
+    });
+  }).catch(function(e) { dbg('applyAccept error: ' + e.message); });
+}
+
+// ─── Reject ──────────────────────────────────────────────────────────────────
+function applyReject(change) {
+  return PowerPoint.run(function(ctx) {
+    return getShape(ctx, change.shapeId).then(function(shape) {
+      if (!shape) return;
+      var tf = shape.textFrame;
+      tf.text = change.oldText;
+      return ctx.sync().then(function() {
+        return restoreFont(ctx, tf, change.origParas);
+      });
+    });
+  }).catch(function(e) { dbg('applyReject error: ' + e.message); });
+}
+
+// ─── Restore font ─────────────────────────────────────────────────────────────
+function restoreFont(ctx, tf, origParas) {
+  tf.load('paragraphs');
+  return ctx.sync().then(function() {
+    tf.paragraphs.load('items');
+    return ctx.sync().then(function() {
+      var baseRun = (origParas && origParas[0] && origParas[0].runs && origParas[0].runs[0]) || {};
+      var promises = tf.paragraphs.items.map(function(para) {
+        para.load('textRanges');
+        return ctx.sync().then(function() {
+          para.textRanges.load('items');
+          return ctx.sync().then(function() {
+            para.textRanges.items.forEach(function(run) {
+              run.font.strikethrough = false;
+              run.font.underline = PowerPoint.ShapeFontUnderlineStyle.none;
+              if (baseRun.color && baseRun.color !== 'null' && baseRun.color !== null) {
+                run.font.color = String(baseRun.color).replace('#','');
+              }
+              if (baseRun.bold    != null) run.font.bold   = baseRun.bold;
+              if (baseRun.italic  != null) run.font.italic = baseRun.italic;
+              if (baseRun.size    != null) run.font.size   = baseRun.size;
+            });
+            return ctx.sync();
+          });
+        });
+      });
+      return Promise.all(promises);
+    });
+  });
+}
+
+// ─── Get shape ───────────────────────────────────────────────────────────────
+function getShape(ctx, shapeId) {
+  var slides = ctx.presentation.slides;
+  slides.load('items');
+  return ctx.sync().then(function() {
+    if (!slides.items.length) return null;
+    var slide = slides.items[0];
+    slide.load('shapes');
+    return ctx.sync().then(function() {
+      slide.shapes.load('items');
+      return ctx.sync().then(function() {
+        var found = null;
+        var loadPromises = slide.shapes.items.map(function(shape) {
+          shape.load('id');
+          return ctx.sync().then(function() {
+            if (shape.id === shapeId) found = shape;
+          });
+        });
+        return Promise.all(loadPromises).then(function() { return found; });
+      });
+    });
+  });
+}
+
+// ─── Poll ────────────────────────────────────────────────────────────────────
+function poll() {
+  if (!isTracking) return;
+  takeSnapshot().then(function(current) {
+    var found = detectChanges(snapshot, current);
+    var chain = Promise.resolve();
+    found.forEach(function(c) {
+      changes.push(c);
+      chain = chain.then(function() { return applyMarkup(c); });
+    });
+    // Re-apply dirty existing changes
+    changes.filter(function(c) { return !c.resolved && c._dirty; }).forEach(function(c) {
+      chain = chain.then(function() { return applyMarkup(c); });
+      c._dirty = false;
+    });
+    return chain;
+  }).then(function() {
+    renderChanges();
+    updateStatus();
+    pollingTimer = setTimeout(poll, POLL_MS);
+  }).catch(function(e) {
+    dbg('Poll error: ' + e.message);
+    pollingTimer = setTimeout(poll, POLL_MS);
+  });
+}
+
+// ─── Toggle tracking ─────────────────────────────────────────────────────────
+function toggleTracking() {
+  if (!isTracking) {
+    dbg('Taking snapshot…');
+    showToast('Snapshotting slide…');
+    takeSnapshot().then(function(snap) {
+      snapshot = snap;
+      isTracking = true;
+      document.getElementById('trackLabel').textContent = 'Stop Tracking';
+      document.getElementById('trackIcon').textContent  = '■';
+      document.getElementById('btnTrack').classList.add('tracking');
+      document.getElementById('btnRefresh').disabled = false;
+      document.getElementById('statusDot').classList.add('active');
+      document.getElementById('statusText').textContent = 'Tracking — edit any text box';
+      dbg('Tracking started — ' + Object.keys(snap).length + ' shapes snapshotted');
+      pollingTimer = setTimeout(poll, POLL_MS);
+      showToast('Tracking started');
+    });
+  } else {
+    clearTimeout(pollingTimer);
+    isTracking = false;
+    document.getElementById('trackLabel').textContent = 'Start Tracking';
+    document.getElementById('trackIcon').textContent  = '▶';
+    document.getElementById('btnTrack').classList.remove('tracking');
+    document.getElementById('btnRefresh').disabled = true;
+    document.getElementById('statusDot').classList.remove('active');
+    document.getElementById('statusDot').classList.remove('reviewing');
+    document.getElementById('statusText').textContent = 'Tracking paused';
+    dbg('Tracking stopped');
+    showToast('Tracking stopped');
+  }
+}
+
+function manualCheck() {
+  showToast('Checking…');
+  takeSnapshot().then(function(current) {
+    var found = detectChanges(snapshot, current);
+    if (found.length > 0) {
+      var chain = Promise.resolve();
+      found.forEach(function(c) { changes.push(c); chain = chain.then(function() { return applyMarkup(c); }); });
+      chain.then(function() { renderChanges(); updateStatus(); showToast(found.length + ' change' + (found.length > 1 ? 's' : '') + ' found'); });
+    } else {
+      showToast('No new changes');
+    }
+  });
+}
+
+// ─── Accept / Reject ─────────────────────────────────────────────────────────
+function acceptChange(id) {
+  var c = null;
+  for (var k = 0; k < changes.length; k++) { if (changes[k].id === id) { c = changes[k]; break; } }
+  if (!c) return;
+  applyAccept(c).then(function() {
+    c.resolved = true; c.resolution = 'accepted';
+    renderChanges(); updateStatus();
+    showToast('Change accepted ✓');
+  });
+}
+
+function rejectChange(id) {
+  var c = null;
+  for (var k = 0; k < changes.length; k++) { if (changes[k].id === id) { c = changes[k]; break; } }
+  if (!c) return;
+  applyReject(c).then(function() {
+    c.resolved = true; c.resolution = 'rejected';
+    renderChanges(); updateStatus();
+    showToast('Change rejected ✕');
+  });
+}
+
+function acceptAll() {
+  var pending = changes.filter(function(c) { return !c.resolved; });
+  var chain = Promise.resolve();
+  pending.forEach(function(c) { chain = chain.then(function() { return applyAccept(c).then(function() { c.resolved = true; c.resolution = 'accepted'; }); }); });
+  chain.then(function() { renderChanges(); updateStatus(); showToast(pending.length + ' changes accepted ✓'); });
+}
+
+function rejectAll() {
+  var pending = changes.filter(function(c) { return !c.resolved; });
+  var chain = Promise.resolve();
+  pending.forEach(function(c) { chain = chain.then(function() { return applyReject(c).then(function() { c.resolved = true; c.resolution = 'rejected'; }); }); });
+  chain.then(function() { renderChanges(); updateStatus(); showToast(pending.length + ' changes rejected ✕'); });
+}
+
+// ─── Render ──────────────────────────────────────────────────────────────────
+function renderChanges() {
+  var area    = document.getElementById('changesArea');
+  var pending = changes.filter(function(c) { return !c.resolved; });
+  var done    = changes.filter(function(c) { return  c.resolved; });
+
+  document.getElementById('btnAcceptAll').disabled = pending.length === 0;
+  document.getElementById('btnRejectAll').disabled = pending.length === 0;
+
+  if (!changes.length) {
+    area.innerHTML = '<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-title">No changes yet</div><div class="empty-desc">Click "Start Tracking", then edit any text box on your slide. Click outside the text box and changes will appear here.</div></div>';
+    return;
+  }
+
+  var html = '';
+  if (pending.length) {
+    html += '<div class="section-label">' + pending.length + ' pending</div>';
+    pending.forEach(function(c) { html += cardHtml(c); });
+  }
+  if (done.length) {
+    html += '<div class="section-label" style="margin-top:6px">' + done.length + ' resolved</div>';
+    done.forEach(function(c) { html += resolvedCardHtml(c); });
+  }
+  area.innerHTML = html;
+}
+
+function cardHtml(c) {
+  var cls   = c.type==='insert' ? 'badge-insert' : c.type==='delete' ? 'badge-delete' : 'badge-replace';
+  var label = c.type==='insert' ? 'Insertion'   : c.type==='delete' ? 'Deletion'    : 'Edit';
+  var init  = c.author.split(' ').map(function(w){return w[0];}).join('').toUpperCase().slice(0,2);
+  return '<div class="change-card">' +
+    '<div class="card-header">' +
+      '<span class="change-type-badge ' + cls + '">' + label + '</span>' +
+      '<div class="card-author"><div class="avatar">' + init + '</div>' + esc(c.author) + '</div>' +
+      '<span class="card-meta">' + fmtTime(c.timestamp) + '</span>' +
+    '</div>' +
+    '<div class="card-body">' +
+      '<div class="card-slide-ref">' + esc(c.shapeName) + '</div>' +
+      '<div class="diff-view">' + buildDiffHtml(c.diff) + '</div>' +
+    '</div>' +
+    '<div class="card-actions">' +
+      '<button class="btn-accept" onclick="acceptChange(\'' + c.id + '\')">✓ Accept</button>' +
+      '<button class="btn-reject" onclick="rejectChange(\'' + c.id + '\')">✕ Reject</button>' +
+    '</div>' +
+  '</div>';
+}
+
+function resolvedCardHtml(c) {
+  var ok  = c.resolution === 'accepted';
+  var col = ok ? 'var(--insert-color)' : 'var(--delete-color)';
+  var bdr = ok ? 'rgba(45,164,78,0.25)' : 'rgba(248,81,73,0.25)';
+  var lbl = ok ? '✓ Accepted' : '✕ Rejected';
+  return '<div class="change-card" style="opacity:0.5;border-color:' + bdr + '">' +
+    '<div class="card-header">' +
+      '<span style="font-size:10px;font-weight:700;color:' + col + '">' + lbl + '</span>' +
+      '<div class="card-author"><div class="avatar">' + c.author[0] + '</div>' + esc(c.author) + '</div>' +
+      '<span class="card-meta">' + esc(c.shapeName) + '</span>' +
+    '</div>' +
+  '</div>';
+}
+
+function buildDiffHtml(diff) {
+  var CTX = 5;
+  var changed = [];
+  diff.forEach(function(d,i) { if (d.type !== 'equal') changed.push(i); });
+  var vis = {};
+  changed.forEach(function(i) {
+    for (var k = Math.max(0,i-CTX); k <= Math.min(diff.length-1,i+CTX); k++) vis[k] = true;
+  });
+  var html = '', prev = true;
+  for (var i = 0; i < diff.length; i++) {
+    if (!vis[i]) { if (prev) html += '<span class="diff-context">…</span>'; prev = false; continue; }
+    prev = true;
+    var d = diff[i], t = esc(d.text);
+    if      (d.type === 'equal')  html += '<span class="diff-context">' + t + '</span>';
+    else if (d.type === 'delete') html += '<span class="diff-delete">'  + t + '</span>';
+    else                          html += '<span class="diff-insert">'  + t + '</span>';
+  }
+  return html;
+}
+
+function updateStatus() {
+  var pending = changes.filter(function(c) { return !c.resolved; });
+  var dot   = document.getElementById('statusDot');
+  var text  = document.getElementById('statusText');
+  var count = document.getElementById('changeCount');
+  if (pending.length) {
+    count.textContent = pending.length + ' change' + (pending.length>1?'s':'');
+    count.classList.add('visible');
+    dot.classList.remove('active'); dot.classList.add('reviewing');
+    text.textContent = pending.length + ' change' + (pending.length>1?'s':'') + ' pending review';
+  } else {
+    count.classList.remove('visible');
+    if (isTracking) { dot.classList.add('active'); dot.classList.remove('reviewing'); text.textContent = 'Tracking — edit any text box'; }
+  }
+}
+
+var toastTimer;
+function showToast(msg) {
+  var t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(function() { t.classList.remove('show'); }, 2200);
+}
+</script>
+</body>
+</html>
